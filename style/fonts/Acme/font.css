@@ -1,0 +1,10 @@
+@font-face {
+  font-family: 'Acme-Regular';
+  src: url('Acme-Regular.woff2') format('woff2'),
+       url('Acme-Regular.woff') format('woff'),
+       url('Acme-Regular.ttf') format('truetype'),
+       url('Acme-Regular.svg#Acme-Regular') format('svg');
+  font-weight: normal;
+  font-style: normal;
+}
+
