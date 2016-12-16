@@ -8,14 +8,14 @@ $(document).ready(function(e) {
 				will be visible and a 'urlHistory' cookie is created.
 	*/
 	var cookie = {
-		flag : false, // MUST default to false (Cookie Act), negate on 'allow cookies'
+		flag : true, // MUST default to false (Cookie Act), negate on 'allow cookies'
+		elements : $('.historyFeature'),
 		name : "urlHistory",
 		data : '',
 		expire : 7, //days
 		isAdded : false
 	};
-	cookie.data = getCookie();
-	setCookie();
+	if(cookie.flag) activateCookie(); // <----- make this into an event handler for 'accept cookies'
 	
 	/* Object:	GoogleAPI object contains all data needed for the Goo.gl API.
 				'attempts' and 'attemptsLimit' hold the number and limit of
@@ -52,6 +52,7 @@ $(document).ready(function(e) {
 	*/
 	var metaInfo = {
 		active : false,
+		elements : $('.websiteInfo'),
 		corProxy : 'https://crossorigin.me/',
 		title : '',
 		description : '',
@@ -59,6 +60,7 @@ $(document).ready(function(e) {
 		copyright : '',
 		keywords : '',
 	}
+	if(metaInfo.active) metaInfo.elements.removeClass('inactive');
 	
 	
 	
@@ -69,12 +71,15 @@ $(document).ready(function(e) {
 	
 	/* Input Handler:	fired when the user changes the value of the input field
 	*/
+	$(document).on("click",'input', function(){
+		this.setSelectionRange(0, this.value.length);
+	});
 	$('input').on("change paste input", function(e){
 		var val = $(this).val();
 		URLInput.isEmpty = $('#col-URL-defaultText').css('display', ((val!==null && val!=="") ? 'none' : 'block')).css('display')=='block';
 		setURLInput();
 		if(URLInput.hasChanged){
-			if(wrapper.state === URLInput.isEmpty){ // has changed
+			if(wrapper.state !== URLInput.isEmpty){ // has changed
 				wrapper.state = !wrapper.state;
 				moveWrapper(URLInput.isEmpty);
 			}
@@ -113,17 +118,21 @@ $(document).ready(function(e) {
 					// update the user on server responses
 					xmlHttp.onreadystatechange = function(){
 						if (xmlHttp.readyState == XMLHttpRequest.DONE){
-							// remove loading text & image
-							setLoading(URLInput.searchVal,false);
+							// remove loading text & image, add green background
+							setLoading('('+URLInput.searchVal+')',false);
+							$('#col-shortUrl').addClass('greenBg, greenBGFlash');
 							// show new short URL
 							var response = JSON.parse(xmlHttp.responseText);
+							if(typeof response.id==='undefined') response.id = URLInput.searchVal;
 							$('#shortUrl').val(response.id);
 							// show website info box (including iFrame)
 							$('#websiteInfoContainer').removeClass('inactive');
 							// update Meta information (if metaInfo allowed)
 							if(metaInfo.active) retrieveMetaData(URLInput.searchVal);
 							// add to cookie (if cookies allowed)
-							if(cookie.flag) updateCookie([URLInput.searchVal,response.id]);
+							if(cookie.flag){
+								updateCookie([URLInput.searchVal,response.id]);
+							}
 						}
 						else if(xmlHttp.readyState == XMLHttpRequest.OPENED){
 							// loading text = 'Working'
@@ -152,7 +161,7 @@ $(document).ready(function(e) {
 					/* End goo.gl shortening */
 				}
 				function getBitlyUrl(){
-					
+					$('#shortUrl').val('Could not shorten URL, please try again');
 				}
 				function setLoading(text,image){
 					if(text !== undefined) $('#loadingContainer span').html(text);
@@ -160,20 +169,13 @@ $(document).ready(function(e) {
 					var img = $('#loadingContainer img');
 					// if param image is true
 					if(image !== undefined){
-						if(image === true){
-							// show image if not already showing
-							img.css('display','block');
-						} else {
-							// hide image if not already hidden
-							img.css('display','none');
-						}
+						// show/ hide image if not already showing
+						img.css('display',(image===true)? 'block' : 'none');
 					}
 					// hide whole container if both params are false
 					if(!text && !image){
-						console.log('fade out image');
 						$('#loadingContainer').fadeOut(200);
 					} else {
-						console.log('fade in image');
 						$('#loadingContainer').css('display','block');
 					}
 				}
@@ -192,7 +194,7 @@ $(document).ready(function(e) {
 
 
 	function moveWrapper(empty){
-		var newRate = (empty)? "50" : "25";
+		var newRate = (empty)? "50" : "30";
 		$('#contentWrapper').stop().animate({top : newRate + "%"},400,"linear",displayWebFrame(empty));
 	}
 	function displayWebFrame(val){
@@ -208,8 +210,10 @@ $(document).ready(function(e) {
 	function setCookie(){
 		if(typeof cookie.data !== "undefined"){
 			if(cookie.data.length>0 && cookie.isAdded===false){
-				//updateHistoryPanel(cookie.data);
-				cookie.isAdded=true;
+				formatCookieData();
+				console.log(cookie.data);
+				console.log(Object.prototype.toString.call(cookie.data));
+				updateHistoryPanel(cookie.data);
 			}
 		}
 		var expire = new Date();
@@ -228,46 +232,84 @@ $(document).ready(function(e) {
 				var valEndPos = history.indexOf(";");
 				history = history.substr(0,valEndPos); // cut out the remainder characters
 			}
-				//history = history.substr(history[i].indexOf(cookie.name),history[i].length);
-			console.log('getCookie:\t'+history);
-				// need to traverse every pair and put hem into a deeper array
+			console.log(history);
 			historyArray = history.split(';');
 			newCookieArray = Array();
-			console.log(historyArray.length);
-			/*
-			for(var i=0;i<=historyArray.length;i+2){
-				newCookieArray.push([historyArray[i],historyArray[i+1]]);
-			}
-			console.log('cArray:\t'+newCookieArray);
-			*/
-			
 			return (new Array(history));
-			
-			//}
-			//}
-			//return [history[1].substr(history[1].indexOf('=')+1)]; // return value
 		} else {
 			return [];	
 		}
 	}
-	function updateCookie(url){
-		console.log('upadte cookie:\t'+url);
+	function formatCookieData(urls){
 		if(Object.prototype.toString.call(cookie.data) === '[object String]'){
 			cookie.data = cookie.data.split(',');
-		};
-		cookie.data.push(url);
-		console.log('pushed:\t'+cookie.data);
-		setCookie();
-		//updateHistoryPanel([url]);
+		}
+		else if(Object.prototype.toString.call(cookie.data) === '[object Array]'){
+			// check to see if there's a string layer inside of the array
+			if(typeof cookie.data[0] !== 'undefined'){
+				// the cookie.data array with newly inputted 
+				
+				console.log(cookie.data);
+				console.log(Object.prototype.toString.call(cookie.data[0]));
+				var splitCookie = cookie.data[0];
+				var splitCookie = splitCookie.split(',');
+				var newCookieArray = new Array();
+				for(var i=0;i<splitCookie.length;i+2){
+					newCookieArray.push(splitCookie.splice(i,2));
+				}
+				cookie.data = newCookieArray;
+				console.log(newCookieArray);
+			}
+		}
+		//if(urls){ cookie.data.push(urls); }
 	}
-	function updateHistoryPanel(urls){
+	function updateCookie(url){
+		console.log(url);
+		formatCookieData(url);
+		console.log(url);
+		setCookie();
 		console.log(cookie.data);
-		$.each(urls,function(key,value){
-			value = value.split(',');
-			$('#historyPanel table').append('<tr><td>'+value[0]+'</td><td><input value="'+value[1]+'"  disabled="disabled" onClick="this.setSelectionRange(0, this.value.length)" /></td></tr>');
-		});
+		updateHistoryPanel(url);
+	}
+	function updateHistoryPanel(url){
+		// add all cookie data to the history table
+		if(cookie.isAdded===false){
+			$.each(cookie.data,function(key,value){
+				$('#historyPanel table').append('<tr><td>'+value[0]+'</td><td><input value="'+value[1]+'" /></td></tr>');
+			});
+			// ensure to make cookies.added=true to remove duplications
+			cookie.isAdded=true;
+		}
+		// prepend the latest searched url
+		$('#historyPanel table').append('<tr><td>'+url[0]+'</td><td><input value="'+url[1]+'" /></td></tr>');
 	}
 	
+	function activateCookie(){
+		cookie.elements.each(function(){
+			$(this).removeClass('inactive');
+		});
+		
+		// Delete Previous Cookie
+		document.cookie = cookie.name+'=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path = /;';
+		
+		cookie.data = getCookie();
+		console.log(cookie.data);
+		setCookie();
+	}
+	
+	/* 	The following function is in the cookies section because it will ONLY be used if
+		cookies is enabled.
+	 */
+	$(document).on('click','.panelOption',function(){
+		// switch panelTabs
+		$('.panelOption').each(function(){
+			$(this).toggleClass('active');
+		});
+		// Switch content
+		$('.panel').each(function(){
+            $(this).toggleClass('hidden');
+        });
+	});
 	
 	
 	/////	EXTRA:	Website Meta Data	/////
